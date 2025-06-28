@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -32,17 +33,22 @@ public class TransactionService {
     private final ModelMapper modelMapper;
     private final MessageSource messageSource;
     private final UserBalanceRepository userBalanceRepository;
+    private final FileService fileService;
 
-    public TransactionService(TransactionsRepository transactionsRepository, ModelMapper modelMapper, MessageSource messageSource, UserBalanceRepository userBalanceRepository) {
+    public TransactionService(TransactionsRepository transactionsRepository, ModelMapper modelMapper, MessageSource messageSource, UserBalanceRepository userBalanceRepository, FileService fileService) {
         this.transactionsRepository = transactionsRepository;
         this.modelMapper = modelMapper;
         this.messageSource = messageSource;
         this.userBalanceRepository = userBalanceRepository;
+        this.fileService = fileService;
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public ResponseEntity<ApiResponse<Object>> addTransactions(TransactionDto transactionDto) {
+    public ResponseEntity<ApiResponse<Object>> addTransactions(TransactionDto transactionDto, MultipartFile file) {
         try {
+            System.out.println("file=1111====");
+            if(!file.isEmpty()) fileService.fileValidation(file);
+            System.out.println("file=====");
             TypeMap<TransactionDto, Transactions> typeMap = modelMapper.getTypeMap(TransactionDto.class, Transactions.class);
 
             if (typeMap == null) {
@@ -51,7 +57,10 @@ public class TransactionService {
             }
             Transactions transactions = modelMapper.map(transactionDto, Transactions.class);
 
-            transactionsRepository.save(transactions);
+            Transactions transaction = transactionsRepository.save(transactions);
+            System.out.println("transaction=== "+transaction);
+            if(!file.isEmpty())
+                fileService.uploadFile(file,transaction.getId());
 
             Date currentDate = new Date();
 
@@ -75,6 +84,7 @@ public class TransactionService {
                 userBalanceRepository.save(userMonthBalance);
             }
 
+
             ApiResponse<Object> apiResponse = new ApiResponse<>(
                     HttpStatus.OK,
                     messageSource.getMessage("transaction.add.success", null, Locale.ENGLISH),
@@ -82,8 +92,9 @@ public class TransactionService {
             );
             return ResponseEntity.ok(apiResponse);
         }catch (Exception ex){
+            System.out.println("ex===== "+ex);
             throw new RuntimeException(
-                    messageSource.getMessage("record.saving.error", null, Locale.ENGLISH),
+                    messageSource.getMessage("transaction.saving.error", null, Locale.ENGLISH),
                     ex
             );
         }
@@ -98,7 +109,11 @@ public class TransactionService {
         Date fromDate = sdf.parse(financeOverviewDto.getFromDate());
         Date toDate = sdf.parse(financeOverviewDto.getToDate());
 
-        Page<Transactions> transactions = transactionsRepository.fetchTransactionsBetweenDates(fromDate,toDate,userId,pageable);
+        String category = financeOverviewDto.getCategory();
+        if(category == null || category.isEmpty()) category = null;
+        System.out.println("category==== "+category);
+
+        Page<Transactions> transactions = transactionsRepository.fetchTransactionsBetweenDates(fromDate,toDate,userId,category,pageable);
 
         ApiResponse<Page<Transactions>> response = new ApiResponse<>(
                 HttpStatus.OK,
@@ -127,13 +142,14 @@ public class TransactionService {
         if(userCurrentBalance == null)
             throw new ResourceNotFoundException(messageSource.getMessage("finance.details.not.found", null, Locale.ENGLISH));
 
-        Map<String, BigDecimal> financeOverview = new HashMap<>();
+        Map<String, Object> financeOverview = new HashMap<>();
         financeOverview.put(AppConstants.BALANCE.toLowerCase(),userCurrentBalance.getBalance());
         financeOverview.put(AppConstants.EXPENSE.toLowerCase(),userCurrentBalance.getExpense());
         financeOverview.put(AppConstants.INCOME.toLowerCase(),userCurrentBalance.getIncome());
-        financeOverview.put(AppConstants.PREVIOUS_BALANCE.toLowerCase(),userPreviousBalance != null ? userPreviousBalance.getBalance() : BigDecimal.valueOf(Integer.MIN_VALUE));
-        financeOverview.put(AppConstants.PREVIOUS_EXPENSE.toLowerCase(),userPreviousBalance != null ? userPreviousBalance.getExpense() : BigDecimal.valueOf(Integer.MIN_VALUE));
-        financeOverview.put(AppConstants.PREVIOUS_INCOME.toLowerCase(),userPreviousBalance != null ? userPreviousBalance.getIncome() : BigDecimal.valueOf(Integer.MIN_VALUE));
+        financeOverview.put(AppConstants.PREVIOUS_BALANCE.toLowerCase(),userPreviousBalance != null ? userPreviousBalance.getBalance() : null);
+        financeOverview.put(AppConstants.PREVIOUS_EXPENSE.toLowerCase(),userPreviousBalance != null ? userPreviousBalance.getExpense() : null);
+        financeOverview.put(AppConstants.PREVIOUS_INCOME.toLowerCase(),userPreviousBalance != null ? userPreviousBalance.getIncome() : null);
+
 
         ApiResponse<Object> response = new ApiResponse<>(
                 HttpStatus.OK,
@@ -153,7 +169,7 @@ public class TransactionService {
         Date toDate = sdf.parse(financeOverviewDto.getToDate());
 
         Pageable wholePage = Pageable.unpaged();
-        Page<Transactions> transactions = transactionsRepository.fetchTransactionsBetweenDates(fromDate,toDate,userId,wholePage);
+        Page<Transactions> transactions = transactionsRepository.fetchTransactionsBetweenDates(fromDate,toDate,userId,null,wholePage);
         if(transactions.isEmpty())
             throw new ResourceNotFoundException(messageSource.getMessage("transaction.not.found", null, Locale.ENGLISH));
         Map<String,List<Map<String, Object>>> categoryTransactions= new HashMap<>();

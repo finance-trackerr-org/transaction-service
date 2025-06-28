@@ -29,4 +29,6 @@ public class FinanceOverviewDto {
             message = "Date must be in the format yyyy-MM-dd"
     )
     private String toDate;
+
+    private String category;
 }

@@ -33,14 +33,24 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
         try {
+            System.out.println("doFilterInternal");
             String authHeader = request.getHeader("Authorization");
-            if (authHeader == null || !authHeader.contains("Bearer"))
+            System.out.println("authHeader=== " + authHeader);
+            if (authHeader == null || !authHeader.contains("Bearer")) {
+                System.out.println("authHeader=====");
                 throw new JwtException("Invalid Token");
+            }
+            System.out.println("jwt====");
 
             String token = authHeader.substring(7);
             String userName = request.getHeader("userName");
+            System.out.println("token==== "+ token +" " + userName);
             String role = jwtService.extractRole(token);
+            System.out.println("token=== " + token);
+            System.out.println("token=== " + userName);
+            System.out.println("token=== " + role);
             if (userName != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                System.out.println("hereeeeee");
                 if (jwtService.validateToken(token, userName)) {
                     List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
                     UsernamePasswordAuthenticationToken authToken =
@@ -48,8 +58,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                     filterChain.doFilter(request, response);
+                    return;
+                } else {
+                    throw new JwtException("Unauthorized user");
                 }
-                throw new JwtException("Unauthorized user");
             }
             throw new JwtException("Unauthorized user");
         } catch (ExpiredJwtException ex) {
@@ -67,7 +79,9 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     Map.of("status", HttpStatus.BAD_REQUEST.value(),
                             "message", (error != null || error!="") ? "Invalid JWT token" : error)
             ));
-            return;
+        } catch (Exception e){
+            String error = e.getMessage();
+            System.out.println(error);
         }
     }
 }

@@ -8,8 +8,10 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
-@RequestMapping("api/category")
+@RequestMapping("/api/category")
 public class UserCategoryController {
     private final TransactionCategoryService transactionCategoryService;
 
@@ -18,8 +20,8 @@ public class UserCategoryController {
     }
 
     @GetMapping("/get-category")
-    ResponseEntity<ApiResponse<Object>> getSystemCategories(@Valid @RequestBody UserIdDto userIdDto){
-        return transactionCategoryService.getSystemCategories(userIdDto);
+    ResponseEntity<ApiResponse<Object>> getSystemCategories(@RequestParam(value="userId",required = true) UUID userId){
+        return transactionCategoryService.getSystemCategories(userId);
     }
 
     @PostMapping("/add-category")

@@ -9,11 +9,12 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.text.ParseException;
 
 @RestController
-@RequestMapping("api/transaction")
+@RequestMapping("/api/transaction")
 public class TransactionController {
     private final TransactionService transactionService;
 
@@ -22,11 +23,14 @@ public class TransactionController {
     }
 
     @PostMapping("/add-transaction")
-    ResponseEntity<ApiResponse<Object>> addTransactions(@Valid @RequestBody TransactionDto transactionDto){
-        return transactionService.addTransactions(transactionDto);
+    ResponseEntity<ApiResponse<Object>> addTransactions(
+            @Valid @RequestPart("data") TransactionDto transactionDto,
+            @RequestPart(value = "attachment", required = false) MultipartFile attachment
+    ){
+        return transactionService.addTransactions(transactionDto, attachment);
     }
 
-    @GetMapping("/get-transactions")
+    @PostMapping("/get-transactions")
     ResponseEntity<ApiResponse<Page<Transactions>>> getTransactions(@RequestParam(value="page",required = false,defaultValue = "0") int page,
                                                                     @RequestParam(value="size",required = false,defaultValue = "5") int size,
                                                                     @Valid @RequestBody FinanceOverviewDto financeOverviewDto

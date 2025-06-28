@@ -25,9 +25,9 @@ public class TransactionCategoryService {
         this.userTransactionCategoryRepository = userTransactionCategoryRepository;
     }
 
-    public ResponseEntity<ApiResponse<Object>> getSystemCategories(UserIdDto userIdDto) {
+    public ResponseEntity<ApiResponse<Object>> getSystemCategories(UUID userId) {
         List<String> categories = new ArrayList<>(SYSTEM_CATEGORIES);
-        UserTransactionCategory userTransactionCategory = userTransactionCategoryRepository.getByUserId(userIdDto.getUserId());
+        UserTransactionCategory userTransactionCategory = userTransactionCategoryRepository.getByUserId(userId);
         if(userTransactionCategory!=null)
             categories.addAll(Arrays.asList(userTransactionCategory.getCategory()));
         ApiResponse<Object> apiResponse = new ApiResponse<>(
@@ -73,7 +73,7 @@ public class TransactionCategoryService {
             ));
         } catch (Exception ex) {
             throw new RuntimeException(
-                    messageSource.getMessage("record.saving.error", null, Locale.ENGLISH),
+                    messageSource.getMessage("category.saving.error", null, Locale.ENGLISH),
                     ex
             );
         }

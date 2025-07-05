@@ -38,12 +38,12 @@ public class TransactionController {
         return transactionService.getTransactions(page,size,financeOverviewDto);
     }
 
-    @GetMapping("/finance-overview")
+    @PostMapping("/finance-overview")
     ResponseEntity<ApiResponse<Object>> getFinanceOverview(@Valid @RequestBody FinanceOverviewDto financeOverviewDto) throws ParseException {
         return transactionService.getFinanceOverview(financeOverviewDto);
     }
 
-    @GetMapping("/transactions-by-category")
+    @PostMapping("/transactions-by-category")
     ResponseEntity<ApiResponse<Object>> getTransactionsByCategory(@Valid @RequestBody FinanceOverviewDto financeOverviewDto) throws ParseException {
         return transactionService.getTransactionsByCategory(financeOverviewDto);
     }

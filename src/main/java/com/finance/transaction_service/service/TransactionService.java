@@ -1,14 +1,20 @@
 package com.finance.transaction_service.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finance.transaction_service.constants.AppConstants;
 import com.finance.transaction_service.dto.ApiResponse;
 import com.finance.transaction_service.dto.FinanceOverviewDto;
 import com.finance.transaction_service.dto.TransactionDto;
+import com.finance.transaction_service.dto.UserMasterBudgetDto;
 import com.finance.transaction_service.entity.Transactions;
 import com.finance.transaction_service.entity.UserBalance;
+import com.finance.transaction_service.exception.BadRequestException;
 import com.finance.transaction_service.exception.ResourceNotFoundException;
 import com.finance.transaction_service.repository.TransactionsRepository;
 import com.finance.transaction_service.repository.UserBalanceRepository;
+import jakarta.validation.Valid;
 import org.modelmapper.ModelMapper;
 import org.modelmapper.TypeMap;
 import org.springframework.context.MessageSource;
@@ -27,6 +33,8 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
+import static com.finance.transaction_service.constants.AppConstants.SYSTEM_CATEGORIES;
+
 @Service
 public class TransactionService {
     private final TransactionsRepository transactionsRepository;
@@ -34,21 +42,24 @@ public class TransactionService {
     private final MessageSource messageSource;
     private final UserBalanceRepository userBalanceRepository;
     private final FileService fileService;
+    private final ObjectMapper objectMapper;
 
-    public TransactionService(TransactionsRepository transactionsRepository, ModelMapper modelMapper, MessageSource messageSource, UserBalanceRepository userBalanceRepository, FileService fileService) {
+    public TransactionService(TransactionsRepository transactionsRepository, ModelMapper modelMapper, MessageSource messageSource, UserBalanceRepository userBalanceRepository, FileService fileService, ObjectMapper objectMapper) {
         this.transactionsRepository = transactionsRepository;
         this.modelMapper = modelMapper;
         this.messageSource = messageSource;
         this.userBalanceRepository = userBalanceRepository;
         this.fileService = fileService;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(rollbackFor = Exception.class)
     public ResponseEntity<ApiResponse<Object>> addTransactions(TransactionDto transactionDto, MultipartFile file) {
         try {
-            System.out.println("file=1111====");
             if(!file.isEmpty()) fileService.fileValidation(file);
-            System.out.println("file=====");
+            if(!SYSTEM_CATEGORIES.contains(transactionDto.getCategory().toUpperCase()))
+                throw new BadRequestException(messageSource.getMessage("Category.invalid", null, Locale.ENGLISH));
+            transactionDto.setCategory(transactionDto.getCategory().toUpperCase());
             TypeMap<TransactionDto, Transactions> typeMap = modelMapper.getTypeMap(TransactionDto.class, Transactions.class);
 
             if (typeMap == null) {
@@ -58,7 +69,6 @@ public class TransactionService {
             Transactions transactions = modelMapper.map(transactionDto, Transactions.class);
 
             Transactions transaction = transactionsRepository.save(transactions);
-            System.out.println("transaction=== "+transaction);
             if(!file.isEmpty())
                 fileService.uploadFile(file,transaction.getId());
 
@@ -84,7 +94,6 @@ public class TransactionService {
                 userBalanceRepository.save(userMonthBalance);
             }
 
-
             ApiResponse<Object> apiResponse = new ApiResponse<>(
                     HttpStatus.OK,
                     messageSource.getMessage("transaction.add.success", null, Locale.ENGLISH),
@@ -92,7 +101,6 @@ public class TransactionService {
             );
             return ResponseEntity.ok(apiResponse);
         }catch (Exception ex){
-            System.out.println("ex===== "+ex);
             throw new RuntimeException(
                     messageSource.getMessage("transaction.saving.error", null, Locale.ENGLISH),
                     ex
@@ -138,7 +146,6 @@ public class TransactionService {
 
         UserBalance userCurrentBalance = userBalanceRepository.findDateBySameMonthAndYear(inputDate,userId);
         UserBalance userPreviousBalance = userBalanceRepository.findDateBySameMonthAndYear(previousMonthDate,userId);
-        System.out.println("userCurrentBalance=====" + userCurrentBalance);
         if(userCurrentBalance == null)
             throw new ResourceNotFoundException(messageSource.getMessage("finance.details.not.found", null, Locale.ENGLISH));
 
@@ -160,7 +167,7 @@ public class TransactionService {
         return ResponseEntity.ok(response);
     }
 
-    public ResponseEntity<ApiResponse<Object>> getTransactionsByCategory(FinanceOverviewDto financeOverviewDto) throws ParseException {
+    public ResponseEntity<ApiResponse<Object>> getTransactionsByCategory(FinanceOverviewDto financeOverviewDto) throws ParseException, JsonProcessingException {
         UUID userId = financeOverviewDto.getUserId();
 
         // Formatting dates
@@ -170,11 +177,21 @@ public class TransactionService {
 
         Pageable wholePage = Pageable.unpaged();
         Page<Transactions> transactions = transactionsRepository.fetchTransactionsBetweenDates(fromDate,toDate,userId,null,wholePage);
+
+        UserBalance userCurrentBalance = userBalanceRepository.findDateBySameMonthAndYear(fromDate,userId);
         if(transactions.isEmpty())
             throw new ResourceNotFoundException(messageSource.getMessage("transaction.not.found", null, Locale.ENGLISH));
+
+        Map<String, BigDecimal> categoryPricing = objectMapper.readValue(
+                userCurrentBalance.getCategoryPricing(),
+                new TypeReference<>() {}
+        );
         Map<String,List<Map<String, Object>>> categoryTransactions= new HashMap<>();
-        Map<String,BigDecimal> categoryAmount= new HashMap<>();
+        Map<String,Map<String,BigDecimal>> categoryAmount= new HashMap<>();
         BigDecimal totalAmountSpent = BigDecimal.valueOf(0.0);
+        Map<String, BigDecimal> defaultEntry = new HashMap<>();
+        defaultEntry.put("spent", BigDecimal.ZERO);
+        defaultEntry.put("budget", BigDecimal.ZERO);
 
         for(Transactions x:transactions){
             String category = x.getCategory();
@@ -195,16 +212,20 @@ public class TransactionService {
 
             if(x.getType().name().equals(AppConstants.EXPENSE)) {
                 totalAmountSpent = totalAmountSpent.add(amount);
-
-                categoryAmount.merge(category, amount, BigDecimal::add);
+                Map<String, BigDecimal> categoryBalance = categoryAmount.getOrDefault(category,defaultEntry);
+                categoryBalance.merge("spent", amount, BigDecimal::add);
+                if(categoryPricing.containsKey(category)) categoryBalance.put("budget", categoryPricing.get(category));
+                else categoryBalance.put("budget", BigDecimal.valueOf(0));
+                categoryAmount.put(category, categoryBalance);
             }
         }
 
         Map<String, BigDecimal> categoryPercentage = new HashMap<>();
 
-        for (Map.Entry<String, BigDecimal> entry : categoryAmount.entrySet()) {
+        for (Map.Entry<String, Map<String, BigDecimal>> entry : categoryAmount.entrySet()) {
             String category = entry.getKey();
-            BigDecimal amount = entry.getValue();
+            Map<String,BigDecimal> categoryBalance = entry.getValue();
+            BigDecimal amount = categoryBalance.get("spent");
 
             BigDecimal percentage = amount
                     .divide(totalAmountSpent, 2, RoundingMode.HALF_UP)  // 2 decimal places
@@ -225,5 +246,44 @@ public class TransactionService {
         );
 
         return ResponseEntity.ok(response);
+    }
+
+    @Transactional
+    public ResponseEntity<ApiResponse<Object>> addUserMasterBudgets(@Valid UserMasterBudgetDto userMasterBudgetDto) {
+        try {
+            Date currentDate = new Date();
+            Map<String,BigDecimal> categoryPriceMap = new HashMap<>();
+            for(Map.Entry<String ,BigDecimal> category : userMasterBudgetDto.getCategoryPricing().entrySet())
+                if(SYSTEM_CATEGORIES.contains(category.getKey().toUpperCase()))
+                    categoryPriceMap.put(category.getKey().toUpperCase(), category.getValue());
+
+            String categoryPricingJson = objectMapper.writeValueAsString(categoryPriceMap);
+            Optional<UserBalance> userBalance = Optional.ofNullable(userBalanceRepository.findDateBySameMonthAndYear(currentDate, userMasterBudgetDto.getUserId()));
+            if (userBalance.isPresent()) {
+                int updatedCount;
+                updatedCount = userBalanceRepository.updateUserBalanceAndCategory(userMasterBudgetDto.getUserId(), userMasterBudgetDto.getTotalBalance(),categoryPricingJson, currentDate);
+                if (updatedCount == 0)
+                    throw new RuntimeException(messageSource.getMessage("user.balance.saving.error", null, Locale.ENGLISH));
+            } else {
+                UserBalance userMonthBalance = new UserBalance();
+                userMonthBalance.setUserId(userMasterBudgetDto.getUserId());
+                userMonthBalance.setDate(currentDate);
+                userMonthBalance.setBalance(userMasterBudgetDto.getTotalBalance());
+                userMonthBalance.setCategoryPricing(categoryPricingJson);
+                userBalanceRepository.save(userMonthBalance);
+            }
+
+            ApiResponse<Object> apiResponse = new ApiResponse<>(
+                    HttpStatus.OK,
+                    messageSource.getMessage("User.balance.add.success", null, Locale.ENGLISH),
+                    null
+            );
+            return ResponseEntity.ok(apiResponse);
+        }catch(Exception e){
+            throw new RuntimeException(
+                    messageSource.getMessage("user.balance.saving.error", null, Locale.ENGLISH),
+                    e
+            );
+        }
     }
 }

@@ -35,4 +35,13 @@ public interface UserBalanceRepository extends JpaRepository<UserBalance, Long> 
             AND user_id = :userId
             """, nativeQuery = true)
     UserBalance findDateBySameMonthAndYear(@Param("inputDate") Date inputDate,@Param("userId") UUID userId);
+
+    @Transactional
+    @Modifying
+    @Query(value = """
+            UPDATE user_balance ub SET total_balance = :totalBalance, category_pricing = CAST(:categoryPricingJson AS jsonb) WHERE ub.user_id = :userId
+            AND EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CAST(:inputDate AS DATE))
+            AND EXTRACT(YEAR FROM date) = EXTRACT(YEAR FROM CAST(:inputDate AS DATE))
+            """, nativeQuery = true)
+    int updateUserBalanceAndCategory(@Param("userId") UUID userId, @Param("totalBalance") BigDecimal totalBalance,@Param("categoryPricingJson") String categoryPricingJson, @Param("inputDate") Date inputDate);
 }

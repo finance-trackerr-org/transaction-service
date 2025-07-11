@@ -73,15 +73,16 @@ public class FileService {
     public ResponseEntity<Resource> downloadFile(Long transactionId) throws FileNotFoundException, MalformedURLException {
         Transactions transactions = transactionsRepository.getReferenceById(transactionId);
         String attachment = transactions.getAttachment();
-        Path filePath = Paths.get(attachment);
-        Resource resource = new UrlResource(filePath.toUri());
+        Path path = Paths.get(attachment);
+        String fileName = path.getFileName().toString();
+        Resource resource = new UrlResource(path.toUri());
 
         if (!resource.exists())
             throw new ResourceNotFoundException(messageSource.getMessage("file.not.found", null, Locale.ENGLISH));
 
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + attachment + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
                 .body(resource);
     }
 }

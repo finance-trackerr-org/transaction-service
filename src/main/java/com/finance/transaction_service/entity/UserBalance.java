@@ -36,6 +36,9 @@ public class UserBalance {
     @Column(name="total_expense",precision = 10,scale = 2,nullable = false)
     private BigDecimal expense = BigDecimal.valueOf(0.0);
 
+    @Column(name="category_pricing",columnDefinition = "jsonb")
+    private String categoryPricing;
+
     @CreationTimestamp
     @Column(updatable = false, name = "created_at")
     private Date createdAt;

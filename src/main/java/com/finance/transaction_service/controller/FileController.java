@@ -28,7 +28,7 @@ public class FileController {
     }
 
     @GetMapping("/download/{id}")
-    public ResponseEntity<Resource> downloadFile(@RequestParam(value = "id") Long transactionId) throws MalformedURLException, FileNotFoundException {
-        return fileService.downloadFile(transactionId);
+    public ResponseEntity<Resource> downloadFile(@PathVariable Long id) throws MalformedURLException, FileNotFoundException {
+        return fileService.downloadFile(id);
     }
 }

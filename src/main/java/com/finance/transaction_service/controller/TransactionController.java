@@ -1,8 +1,10 @@
 package com.finance.transaction_service.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.finance.transaction_service.dto.ApiResponse;
 import com.finance.transaction_service.dto.FinanceOverviewDto;
 import com.finance.transaction_service.dto.TransactionDto;
+import com.finance.transaction_service.dto.UserMasterBudgetDto;
 import com.finance.transaction_service.entity.Transactions;
 import com.finance.transaction_service.service.TransactionService;
 import jakarta.validation.Valid;
@@ -44,7 +46,12 @@ public class TransactionController {
     }
 
     @PostMapping("/transactions-by-category")
-    ResponseEntity<ApiResponse<Object>> getTransactionsByCategory(@Valid @RequestBody FinanceOverviewDto financeOverviewDto) throws ParseException {
+    ResponseEntity<ApiResponse<Object>> getTransactionsByCategory(@Valid @RequestBody FinanceOverviewDto financeOverviewDto) throws ParseException, JsonProcessingException {
         return transactionService.getTransactionsByCategory(financeOverviewDto);
+    }
+
+    @PostMapping("/add-user-budgets")
+    ResponseEntity<ApiResponse<Object>> addUserMasterBudgets(@Valid @RequestBody UserMasterBudgetDto userMasterBudgetDto) {
+        return transactionService.addUserMasterBudgets(userMasterBudgetDto);
     }
 }

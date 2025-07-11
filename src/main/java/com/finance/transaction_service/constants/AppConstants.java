@@ -12,6 +12,6 @@ public class AppConstants {
     public static final String PREVIOUS_EXPENSE = "PREVIOUS_EXPENSE";
     public static final String PREVIOUS_INCOME = "PREVIOUS_INCOME";
     public static final String PREVIOUS_BALANCE = "PREVIOUS_BALANCE";
-    public static final List<String> SYSTEM_CATEGORIES = Arrays.asList("Housing","Food","Transportation","Entertainment","Shopping","Medical","Utilities");
+    public static final List<String> SYSTEM_CATEGORIES = Arrays.asList("HOUSING","FOOD","TRANSPORTATION","ENTERTAINMENT","SHOPPING","MEDICAL","UTILITIES");
     private AppConstants(){}
 }

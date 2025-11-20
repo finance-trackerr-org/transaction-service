@@ -1,0 +1,1 @@
+Alter table transactions alter column description varchar(20);

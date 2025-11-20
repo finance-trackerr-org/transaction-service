@@ -40,17 +40,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 System.out.println("authHeader=====");
                 throw new JwtException("Invalid Token");
             }
-            System.out.println("jwt====");
 
             String token = authHeader.substring(7);
             String userName = request.getHeader("userName");
-            System.out.println("token==== "+ token +" " + userName);
             String role = jwtService.extractRole(token);
-            System.out.println("token=== " + token);
-            System.out.println("token=== " + userName);
-            System.out.println("token=== " + role);
             if (userName != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                System.out.println("hereeeeee");
                 if (jwtService.validateToken(token, userName)) {
                     List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
                     UsernamePasswordAuthenticationToken authToken =
